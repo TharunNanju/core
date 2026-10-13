@@ -21,6 +21,7 @@
 #include "model/PreprocessPlan.h"
 #include "nodes/io/Input.h"
 #include "pipeline/BoxDecodeType.h"
+#include "pipeline/ExecutionPlan.h"
 #include "pipeline/SuperPointTypes.h"
 #include "pipeline/YoloXSegPoseTypes.h"
 #include "pipeline/Run.h"
@@ -611,6 +612,40 @@ public:
   Runner build(const std::vector<cv::Mat>& inputs,
                const RouteOptions& opt = default_route_options(),
                const simaai::neat::RunOptions& run_opt = default_run_options());
+#endif
+
+  /**
+   * @brief Describe what the matching `build(...)` executes.
+   *
+   * Builds the Model with the same arguments and startup preflight off, reads the plan that build
+   * recorded, and closes the pipeline. The plan lists the Model's nodes (preprocessing,
+   * quantization, EV74/A65 kernels, MLA), where each one runs, and the tensors between them.
+   * @throws NeatError on the errors `build(...)` raises.
+   */
+  simaai::neat::ExecutionPlan execution_plan();
+  /// Execution plan of `build(opt)`.
+  simaai::neat::ExecutionPlan execution_plan(const RouteOptions& opt);
+  /// Execution plan of `build(run_opt)`.
+  simaai::neat::ExecutionPlan execution_plan(const simaai::neat::RunOptions& run_opt);
+  /// Execution plan of `build(opt, run_opt)`.
+  simaai::neat::ExecutionPlan execution_plan(const RouteOptions& opt,
+                                             const simaai::neat::RunOptions& run_opt);
+  /// Execution plan of `build(inputs, opt, run_opt)` for `Tensor` inputs.
+  simaai::neat::ExecutionPlan
+  execution_plan(const simaai::neat::TensorList& inputs,
+                 const RouteOptions& opt = default_route_options(),
+                 const simaai::neat::RunOptions& run_opt = default_run_options());
+  /// Execution plan of `build(inputs, opt, run_opt)` for `Sample` inputs.
+  simaai::neat::ExecutionPlan
+  execution_plan(const simaai::neat::Sample& inputs,
+                 const RouteOptions& opt = default_route_options(),
+                 const simaai::neat::RunOptions& run_opt = default_run_options());
+#if defined(SIMA_WITH_OPENCV)
+  /// Execution plan of `build(inputs, opt, run_opt)` for `cv::Mat` inputs.
+  simaai::neat::ExecutionPlan
+  execution_plan(const std::vector<cv::Mat>& inputs,
+                 const RouteOptions& opt = default_route_options(),
+                 const simaai::neat::RunOptions& run_opt = default_run_options());
 #endif
 
   // ── One-shot execution (synchronous) ─────────────────────────────────────────────────────
