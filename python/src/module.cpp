@@ -2550,6 +2550,9 @@ NB_MODULE(_pyneat_core, m) {
       .def_rw("port_name", &simaai::neat::InputDropInfo::port_name)
       .def_rw("reason", &simaai::neat::InputDropInfo::reason);
 
+  // The deprecated power profile helpers stay bound for compatibility.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
   nb::class_<RunOptions>(m, "RunOptions")
       .def(nb::init<>())
       .def_rw("preset", &RunOptions::preset)
@@ -2583,6 +2586,7 @@ NB_MODULE(_pyneat_core, m) {
   m.def("modalix_dvt_power_monitor_options", &simaai::neat::modalix_dvt_power_monitor_options,
         "sample_interval_ms"_a = 100);
   m.def("power_monitor_profile_name", &simaai::neat::power_monitor_profile_name, "profile"_a);
+#pragma GCC diagnostic pop
 
   nb::class_<NodeLatencySummary>(m, "NodeLatencySummary")
       .def(nb::init<>())
@@ -4228,7 +4232,7 @@ NB_MODULE(_pyneat_core, m) {
   // Already-bound config/summary types and the *_power_monitor_options factories are REUSED via
   // aliases (not rebound/relocated — relocation would break test_api_surface). format_power_summary
   // / power_summary_to_json (formatting helpers) are deferred.
-  nb::module_ power_mod = m.def_submodule("power", "Board power telemetry (PMBus rail readings).");
+  nb::module_ power_mod = m.def_submodule("power", "Board power telemetry read from Sentinel.");
   nb::class_<simaai::neat::PowerFieldReading>(power_mod, "PowerFieldReading")
       .def_ro("available", &simaai::neat::PowerFieldReading::available)
       .def_ro("raw", &simaai::neat::PowerFieldReading::raw)
@@ -4252,11 +4256,15 @@ NB_MODULE(_pyneat_core, m) {
       .def("summary", &simaai::neat::PowerMonitor::summary)
       .def("running", &simaai::neat::PowerMonitor::running);
   power_mod.def("read_power_snapshot", &simaai::neat::read_power_snapshot, "options"_a);
+  // The deprecated power profile helpers stay bound for compatibility.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
   power_mod.def("default_modalix_som_power_rails", &simaai::neat::default_modalix_som_power_rails);
   power_mod.def("default_modalix_dvt_power_rails", &simaai::neat::default_modalix_dvt_power_rails);
   power_mod.def("detect_default_power_monitor_profile",
                 &simaai::neat::detect_default_power_monitor_profile);
   power_mod.def("power_rails_for_profile", &simaai::neat::power_rails_for_profile, "profile"_a);
+#pragma GCC diagnostic pop
   // Reuse already-bound config/summary types + option factories (S9: alias, don't relocate).
   power_mod.attr("PowerMonitorProfile") = m.attr("PowerMonitorProfile");
   power_mod.attr("PowerMonitorOptions") = m.attr("PowerMonitorOptions");
@@ -4626,14 +4634,47 @@ NB_MODULE(_pyneat_core, m) {
       .def_rw("original_width", &simaai::neat::BenchmarkOptions::original_width)
       .def_rw("original_height", &simaai::neat::BenchmarkOptions::original_height)
       .def_rw("resize_mode", &simaai::neat::BenchmarkOptions::resize_mode)
-      .def_rw("include_plugin_latency", &simaai::neat::BenchmarkOptions::include_plugin_latency);
+      .def_rw("include_plugin_latency", &simaai::neat::BenchmarkOptions::include_plugin_latency)
+      .def_rw("min_duration_ms", &simaai::neat::BenchmarkOptions::min_duration_ms);
+
+  nb::class_<simaai::neat::BenchmarkMetric>(m, "BenchmarkMetric")
+      .def(nb::init<>())
+      .def_ro("key", &simaai::neat::BenchmarkMetric::key)
+      .def_ro("label", &simaai::neat::BenchmarkMetric::label)
+      .def_ro("unit", &simaai::neat::BenchmarkMetric::unit)
+      .def_ro("samples", &simaai::neat::BenchmarkMetric::samples)
+      .def_ro("mean", &simaai::neat::BenchmarkMetric::mean)
+      .def_ro("minimum", &simaai::neat::BenchmarkMetric::minimum)
+      .def_ro("maximum", &simaai::neat::BenchmarkMetric::maximum);
+
+  nb::class_<simaai::neat::BenchmarkTelemetry>(m, "BenchmarkTelemetry")
+      .def(nb::init<>())
+      .def_ro("status", &simaai::neat::BenchmarkTelemetry::status)
+      .def_ro("trace_id", &simaai::neat::BenchmarkTelemetry::trace_id)
+      .def_ro("sentinel_version", &simaai::neat::BenchmarkTelemetry::sentinel_version)
+      .def_ro("sample_interval_ms", &simaai::neat::BenchmarkTelemetry::sample_interval_ms)
+      .def_ro("samples", &simaai::neat::BenchmarkTelemetry::samples)
+      .def_ro("power_som_watts", &simaai::neat::BenchmarkTelemetry::power_som_watts)
+      .def_ro("power_mla_watts", &simaai::neat::BenchmarkTelemetry::power_mla_watts)
+      .def_ro("power_rails_watts", &simaai::neat::BenchmarkTelemetry::power_rails_watts)
+      .def_ro("die_temperatures_c", &simaai::neat::BenchmarkTelemetry::die_temperatures_c)
+      .def_ro("die_temperature_max_c", &simaai::neat::BenchmarkTelemetry::die_temperature_max_c)
+      .def_ro("board_temperatures_c", &simaai::neat::BenchmarkTelemetry::board_temperatures_c)
+      .def_ro("cpu_usage_pct", &simaai::neat::BenchmarkTelemetry::cpu_usage_pct)
+      .def_ro("mla_memory_mib", &simaai::neat::BenchmarkTelemetry::mla_memory_mib)
+      .def_ro("cma_memory_mib", &simaai::neat::BenchmarkTelemetry::cma_memory_mib)
+      .def_ro("linux_memory_used_mib", &simaai::neat::BenchmarkTelemetry::linux_memory_used_mib);
 
   nb::class_<simaai::neat::BenchmarkReport>(m, "BenchmarkReport")
       .def(nb::init<>())
       .def_rw("latency_ms", &simaai::neat::BenchmarkReport::latency_ms)
       .def_rw("fps", &simaai::neat::BenchmarkReport::fps)
       .def_rw("avg_power_watts", &simaai::neat::BenchmarkReport::avg_power_watts)
-      .def_rw("energy_joules", &simaai::neat::BenchmarkReport::energy_joules);
+      .def_rw("energy_joules", &simaai::neat::BenchmarkReport::energy_joules)
+      .def_rw("peak_power_watts", &simaai::neat::BenchmarkReport::peak_power_watts)
+      .def_rw("throughput_samples", &simaai::neat::BenchmarkReport::throughput_samples)
+      .def_rw("throughput_duration_ms", &simaai::neat::BenchmarkReport::throughput_duration_ms)
+      .def_ro("telemetry", &simaai::neat::BenchmarkReport::telemetry);
 
   // ── Phase 3: model / preprocess introspection (plan slice S1/S14) ────────────────────────────
   // Tiering per S1 ("advanced = by namespace, not by docs"): the diagnostic snapshots that are the

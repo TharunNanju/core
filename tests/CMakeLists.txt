@@ -120,18 +120,20 @@ add_custom_target(prepare_perf_codec_fixtures
   VERBATIM
 )
 
-# Bundle the installer beside its test so installed extras can run it.
+# Bundle the installers beside their test so installed extras can run them.
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tools")
 configure_file(
   "${CMAKE_CURRENT_SOURCE_DIR}/tools/test_install_neat_framework_native_restore.py"
   "${CMAKE_CURRENT_BINARY_DIR}/tools/test_install_neat_framework_native_restore.py"
   COPYONLY
 )
-configure_file(
-  "${CMAKE_SOURCE_DIR}/tools/install_neat_framework.sh"
-  "${CMAKE_CURRENT_BINARY_DIR}/tools/install_neat_framework.sh"
-  COPYONLY
-)
+foreach(_installer install_neat_framework.sh install_sentinel.sh)
+  configure_file(
+    "${CMAKE_SOURCE_DIR}/tools/${_installer}"
+    "${CMAKE_CURRENT_BINARY_DIR}/tools/${_installer}"
+    COPYONLY
+  )
+endforeach()
 add_test(
   NAME unit_install_neat_framework_native_restore_test
   COMMAND "${Python3_EXECUTABLE}"
@@ -420,6 +422,7 @@ set(UNIT_TESTS
   unit_tensorbuffer_strided_parent_view_materialize_test
   unit_asset_utils_readable_model_tar_test
   unit_benchmark_measurement_contract_test
+  unit_benchmark_telemetry_test
   unit_measurement_consistency_test
   unit_lttng_plugin_percentiles_test
   unit_model_infer_output_name_test
