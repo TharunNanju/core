@@ -55,6 +55,44 @@ Python надає доступ до тих самих полів через `pyn
 
 Дані про потужність надходять від Sentinel — демона телеметрії плати, який налаштовує інсталятор Neat. `report.telemetry` також містить потужність шин живлення, температури кристала й плати, завантаження CPU та пам’ять MLA для проходу вимірювання пропускної здатності; опис кожного поля див. у розділі [Вимірювання виконання моделі](/develop-apps/development-workflow/model#power-and-board-telemetry). Якщо Sentinel не запущено або він записує іншу трасу, тест усе одно надає інформацію про затримку та пропускну здатність, залишає поля потужності нульовими та записує причину в `report.telemetry.status`.
 
+### Розширені можливості: статистика шарів {#step-read-layer-stats}
+
+Додайте `--include-layer-stats` до будь-якої команди прикладу, щоб включити час виконання шарів до звіту бенчмарку. Типово цю опцію вимкнено. Через API її можна ввімкнути так:
+
+```cpp
+simaai::neat::BenchmarkOptions options;
+options.include_layer_stats = true;
+auto report = model.benchmark(options);
+```
+
+```python
+options = pyneat.BenchmarkOptions()
+options.include_layer_stats = True
+report = model.benchmark(options)
+```
+
+У `report.layer_stats` доступні `name`, `stage_index` із нульовою нумерацією та `total_execution_time_us` для кожного скомпільованого шару MLA. Зберігаються також no-op записи з нульовим часом. Час шарів вимірюється в окремих проходах профілювання, тому його сума не дорівнює загальній затримці.
+
+### Збереження звіту {#step-save-report}
+
+Викличте `report.save(path)`, щоб записати повний звіт у YAML або JSON, включно зі статистикою шарів, якщо її запитано:
+
+```cpp
+auto path = report.save("results/model/yolo_benchmark.yaml");
+auto json_path = report.save("results/model/yolo_benchmark.json");
+```
+
+```python
+path = report.save("results/model/yolo_benchmark.yaml")
+json_path = report.save("results/model/yolo_benchmark.json")
+```
+
+Розширення `.json` вибирає JSON; `.yaml` та всі інші закінчення використовують YAML. Ім’я файлу зберігається.
+
+Укажіть шлях разом з іменем файлу. Відсутні батьківські каталоги створюються, наявний файл замінюється, а метод повертає шлях записаного файлу. Збереження виконується явно; `benchmark()` не створює файл звіту автоматично.
+
+До будь-якої команди прикладу додайте `--report results/model/yolo_benchmark.yaml`. Поєднайте з `--include-layer-stats`, щоб зберегти основні вимірювання та час виконання шарів.
+
 ## Run
 
 Запустіть його, і ви повинні побачити зведену інформацію про результати тестування, яку буде надруковано. `benchmark()`, після чого будуть надруковані ті самі значення з отриманого звіту. Запустіть команди **Python** і **C++ (попередньо скомпільовані)** зNeat встановити в кореневу директорію **(директорію, яка містить) `share/` і `lib/`); виконайте команди **збірки з вихідного коду** з **кореневої директорії репозиторію**.
@@ -73,8 +111,8 @@ python3 share/sima-neat/tutorials/003_benchmark_your_model/benchmark_your_model.
 
 **C++ (build from source):**
 ```bash
-./build.sh --target tutorial_003_benchmark_your_model
-./build/tutorials-standalone/tutorial_003_benchmark_your_model \
+./build.sh --all --no-doc
+./build/tutorials/tutorial_003_benchmark_your_model \
   --model /tmp/resnet_50.tar.gz --samples 100
 ```
 
