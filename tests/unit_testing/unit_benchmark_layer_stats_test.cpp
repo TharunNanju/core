@@ -34,11 +34,6 @@ struct Fixture {
     std::ofstream(path) << value;
     return path;
   }
-  std::filesystem::path runtime(const std::string& body) {
-    const auto file = write("fake mla-rt", "#!/bin/sh\nset -eu\n" + body);
-    std::filesystem::permissions(file, std::filesystem::perms::owner_all);
-    return file;
-  }
 };
 std::string read(const std::filesystem::path& path) {
   std::ifstream file(path);
@@ -71,13 +66,6 @@ LayerProfileStage stage(Fixture& fixture, const std::string& source = input) {
   auto selected = resolve_layer_profile_stages(contract).front();
   selected.stage_index = 2;
   return selected;
-}
-std::string capture(const Fixture& fixture) {
-  // Quote fixture paths containing spaces.
-  return "printf '%s' \"$6\" > '" + (fixture.root / "copied-path").string() + "'\n";
-}
-std::string emit(const std::string& text) {
-  return "cat > \"${6%.yaml}_output.yaml\" <<'YAML'\n" + text + "YAML\n";
 }
 void pairing_and_stage_order() {
   Fixture fixture;
@@ -116,33 +104,32 @@ void pairing_and_stage_order() {
   std::filesystem::remove(stages[0].stats_yaml);
   fails([&] { resolve_layer_profile_stages(contract); }, "missing matching stats YAML");
 }
-void successful_profile_preserves_original_and_cleans_files() {
+void completed_report_preserves_original() {
   Fixture fixture;
   const auto selected = stage(fixture);
-  const auto command =
-      fixture.runtime("[ \"$1\" = --connect ] && [ \"$2\" = mip,ma ] && [ \"$3\" = -vs ] && "
-                      "[ \"$4\" = -N ] && [ \"$5\" = --per-layer-stats ]\n" +
-                      capture(fixture) + emit(output));
+  const auto report = fixture.write("measured.yaml", output);
   auto second = selected;
   second.stage_index = 0;
-  const auto records = collect_mla_layer_stats({selected, second}, command);
+  auto records = read_mla_layer_statistics(selected, report);
+  const auto next = read_mla_layer_statistics(second, report);
+  records.insert(records.end(), next.begin(), next.end());
   require(records.size() == 4 && records[0].name == "MLA_0/noop" &&
               records[0].total_execution_time_us == 0 &&
               records[1].total_execution_time_us == 161.95 && records[0].stage_index == 2 &&
               records[2].stage_index == 0,
-          "retain no-ops, compiler names, hardware times, and stage identity");
-  require(read(selected.stats_yaml) == input, "compiler YAML must remain unchanged");
-  require(!std::filesystem::exists(read(fixture.root / "copied-path")), "temporary YAML cleaned");
+          "retain no-ops, compiler names, supplied times, and stage identity");
+  require(read(selected.stats_yaml) == input && read(report) == output,
+          "report validation must not modify either source");
 }
 void unrelated_metadata_is_ignored() {
   Fixture fixture;
   const auto source = input + "  compiler_metadata:\n    tags: [conv, quantized]\n";
   const auto selected = stage(fixture, source);
-  const auto command = fixture.runtime(emit(output + "  debug_metadata: {version: 1}\n"));
-  const auto records = collect_mla_layer_stats({selected}, command);
+  const auto report = fixture.write("measured.yaml", output + "  debug_metadata: {version: 1}\n");
+  const auto records = read_mla_layer_statistics(selected, report);
   require(records.size() == 2 && records.back().total_execution_time_us == 161.95,
-          "unrelated nested metadata must not change layer timing collection");
-  require(read(selected.stats_yaml) == source, "compiler metadata must be preserved unchanged");
+          "unrelated metadata must not change layer timings");
+  require(read(selected.stats_yaml) == source, "compiler metadata remains unchanged");
 }
 
 void invalid_inputs_are_rejected_before_profiling() {
@@ -156,24 +143,34 @@ void invalid_inputs_are_rejected_before_profiling() {
     fails([&] { stage(fixture, text); }, error);
 }
 
-void process_failures_and_timeout_clean_up() {
+void text_report_preserves_independent_validation() {
   Fixture fixture;
   const auto selected = stage(fixture);
-  auto command = fixture.runtime(capture(fixture) + "echo 'runtime diagnostic' >&2\nexit 7\n");
-  fails([&] { collect_mla_layer_stats({selected}, command); }, "runtime diagnostic");
-  require(!std::filesystem::exists(read(fixture.root / "copied-path")), "failed run cleaned");
-  command = fixture.runtime(capture(fixture) + "sleep 30 &\nexit 0\n");
-  const auto begin = std::chrono::steady_clock::now();
-  fails([&] { collect_mla_layer_stats({selected}, command, std::chrono::milliseconds(80)); },
-        "timed out");
-  require(std::chrono::steady_clock::now() - begin < std::chrono::seconds(3), "timeout is bounded");
-  require(!std::filesystem::exists(read(fixture.root / "copied-path")), "timeout cleaned");
-  fails([&] { collect_mla_layer_stats({selected}, fixture.root / "missing-runtime"); },
-        "cannot start mla-rt");
-  command = fixture.runtime(capture(fixture) + "echo 'no stats generated' >&2\n");
-  fails([&] { collect_mla_layer_stats({selected}, command); }, "no stats generated");
-  require(!std::filesystem::exists(read(fixture.root / "copied-path")), "missing output cleaned");
+  const auto report = fixture.write("measured.yaml", output);
+  const auto file_records = read_mla_layer_statistics(selected, report);
+  const auto text_records = parse_mla_layer_statistics(selected, output);
+  require(text_records.size() == file_records.size(), "text and file reports have the same rows");
+  for (std::size_t i = 0; i < text_records.size(); ++i) {
+    require(text_records[i].name == file_records[i].name &&
+                text_records[i].stage_index == file_records[i].stage_index &&
+                text_records[i].total_execution_time_us == file_records[i].total_execution_time_us,
+            "Scheduler-returned text must use the independent Core report validator");
+  }
+  fails([&] { parse_mla_layer_statistics(selected, std::string(8U * 1024U * 1024U + 1, ' ')); },
+        "exceeds 8 MiB");
+  require(read(selected.stats_yaml) == input, "text validation does not alter compiler YAML");
 }
+
+void invalid_collection_is_rejected_before_scheduler() {
+  fails([] { collect_mla_layer_stats({}); }, "no MLA stages");
+  Fixture fixture;
+  const auto selected = stage(fixture);
+  fails([&] { collect_mla_layer_stats({selected}, std::chrono::milliseconds::zero()); },
+        "timeout must be positive");
+  fails([&] { collect_mla_layer_stats({selected}, std::chrono::milliseconds(-1)); },
+        "timeout must be positive");
+}
+
 void invalid_outputs_are_rejected() {
   Fixture fixture;
   const auto selected = stage(fixture);
@@ -183,9 +180,9 @@ void invalid_outputs_are_rejected() {
            {"2:\n  name: wrong\n  start_cycle: 5\n  end_cycle: 20\n  run_time: 1us\n",
             "does not match"},
            {output + output, "duplicate layer ID"}}) {
-    const auto command = fixture.runtime(capture(fixture) + emit(text));
-    fails([&] { collect_mla_layer_stats({selected}, command); }, error);
-    require(!std::filesystem::exists(read(fixture.root / "copied-path")), "parse failure cleaned");
+    const auto report = fixture.write("measured.yaml", text);
+    fails([&] { read_mla_layer_statistics(selected, report); }, error);
+    fails([&] { parse_mla_layer_statistics(selected, text); }, error);
   }
   for (const auto& [time, error] :
        std::vector<std::pair<std::string, std::string>>{{"nanus", "invalid run_time"},
@@ -194,22 +191,24 @@ void invalid_outputs_are_rejected() {
                                                         {"0us", "no hardware timings"}}) {
     auto text = output;
     text.replace(text.find("161.95us"), 8, time);
-    const auto command = fixture.runtime(emit(text));
-    fails([&] { collect_mla_layer_stats({selected}, command); }, error);
+    const auto report = fixture.write("measured.yaml", text);
+    fails([&] { read_mla_layer_statistics(selected, report); }, error);
+    fails([&] { parse_mla_layer_statistics(selected, text); }, error);
   }
   auto text = output;
   text.replace(text.find("0.00us"), 6, "100us");
-  const auto command = fixture.runtime(emit(text));
-  fails([&] { collect_mla_layer_stats({selected}, command); }, "zero-cycle layer");
+  const auto report = fixture.write("measured.yaml", text);
+  fails([&] { read_mla_layer_statistics(selected, report); }, "zero-cycle layer");
   require(read(selected.stats_yaml) == input, "invalid output must not modify source YAML");
 }
 } // namespace
 
 RUN_TEST("unit_benchmark_layer_stats_test", ([] {
            pairing_and_stage_order();
-           successful_profile_preserves_original_and_cleans_files();
+           completed_report_preserves_original();
            unrelated_metadata_is_ignored();
            invalid_inputs_are_rejected_before_profiling();
-           process_failures_and_timeout_clean_up();
+           text_report_preserves_independent_validation();
+           invalid_collection_is_rejected_before_scheduler();
            invalid_outputs_are_rejected();
          }));

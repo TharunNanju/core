@@ -32,9 +32,21 @@ struct LayerProfileStage {
 std::vector<LayerProfileStage>
 resolve_layer_profile_stages(const pipeline_internal::sima::MpkContract& contract);
 
+// Check Scheduler's offline diagnostic capability before benchmark inference.
+// Profiling requires an idle DevKit; this does not arbitrate unrelated workloads.
+void require_owned_mla_layer_profiling();
+
+// Scheduler owns the cold provider session. Core keeps stage and report policy.
 std::vector<LayerStats>
 collect_mla_layer_stats(const std::vector<LayerProfileStage>& stages,
-                        const std::filesystem::path& mla_rt,
-                        std::chrono::milliseconds timeout = std::chrono::seconds(120));
+                        std::chrono::milliseconds timeout = std::chrono::milliseconds(120000));
+
+// Pure report validation. The caller supplies an already collected report;
+// parsing does not establish execution or DMA-retirement evidence.
+std::vector<LayerStats> read_mla_layer_statistics(const LayerProfileStage& stage,
+                                                  const std::filesystem::path& output_yaml);
+
+std::vector<LayerStats> parse_mla_layer_statistics(const LayerProfileStage& stage,
+                                                   const std::string& output_yaml);
 
 } // namespace simaai::neat::internal

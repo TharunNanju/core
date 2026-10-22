@@ -60,7 +60,13 @@ Power comes from Sentinel, the board telemetry daemon that the Neat installer se
 ### Advanced: per-layer stats {#step-read-layer-stats}
 
 Add `--include-layer-stats` to either tutorial command to include layer timings in the
-benchmark report. This option is disabled by default. To enable it through the API:
+benchmark report. This option is disabled by default. Use an idle DevKit with no overlapping
+MLA workloads and a Scheduler/provider pair that supports the owned offline profiling protocol.
+Installing the legacy `mla-rt` command alone is insufficient. If profiling reports unknown
+completion, recover the device before running another workload; a timeout does not mean the
+hardware has stopped.
+
+To enable it through the API:
 
 ```cpp
 simaai::neat::BenchmarkOptions options;

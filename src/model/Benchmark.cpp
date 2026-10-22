@@ -4,6 +4,7 @@
 #include "model/internal/ModelFormat.h"
 #include "model/internal/ModelInternal.h"
 #include "pipeline/internal/InputStreamUtil.h"
+#include "pipeline/internal/TelemetryMonitorInternal.h"
 #include "pipeline/internal/TensorMath.h"
 
 #include <glib.h>
@@ -58,11 +59,7 @@ Tensor make_synthetic_benchmark_tensor(const TensorSpec& spec, std::size_t input
     shape.push_back(dim);
   }
 
-  if (spec.image_format == ImageSpec::PixelFormat::NV12 ||
-      spec.image_format == ImageSpec::PixelFormat::I420) {
-    throw std::runtime_error(
-        "Model::benchmark: planar image input specs are not supported by the synthetic benchmark");
-  }
+  internal::validate_synthetic_benchmark_image_format(spec);
 
   std::uint64_t element_count = 1;
   for (const int64_t dim : shape) {
@@ -344,6 +341,15 @@ void require_benchmark_output(const simaai::neat::Sample& out, const char* where
 
 namespace internal {
 
+void validate_synthetic_benchmark_image_format(const TensorSpec& spec) {
+  if (spec.image_format == ImageSpec::PixelFormat::NV12 ||
+      spec.image_format == ImageSpec::PixelFormat::NV16 ||
+      spec.image_format == ImageSpec::PixelFormat::I420) {
+    throw std::runtime_error(
+        "Model::benchmark: planar image input specs are not supported by the synthetic benchmark");
+  }
+}
+
 TensorSpec resolve_benchmark_input_spec(TensorSpec spec, const ResolvedPreprocessPlan& plan,
                                         const BenchmarkOptions& options) {
   if (!benchmark_takes_source_image(plan, spec.image_format.has_value(), spec.shape.size())) {
@@ -378,25 +384,19 @@ Model::Options benchmark_build_model_options(const Model::Options& model_options
 
 BenchmarkReport internal::run_benchmark(Model& model, const BenchmarkOptions& options) {
   validate_benchmark_options(options);
-  // This gate covers benchmark calls only; MIP profiling requires an idle devkit.
+  // This gate covers benchmark calls only; offline profiling requires an idle DevKit.
   static std::shared_mutex benchmark_gate;
   std::unique_lock exclusive(benchmark_gate, std::defer_lock);
   std::shared_lock shared(benchmark_gate, std::defer_lock);
   std::vector<LayerProfileStage> profile_stages;
-  std::filesystem::path mla_rt;
   if (options.include_layer_stats) {
     exclusive.lock();
+    require_owned_mla_layer_profiling();
     const auto& contract = ModelAccess::pack(model).mpk_contract();
     if (!contract) {
       throw std::runtime_error("Model::benchmark: layer profiling requires an MPK manifest");
     }
     profile_stages = resolve_layer_profile_stages(*contract);
-    gchar* executable = g_find_program_in_path("mla-rt");
-    if (!executable) {
-      throw std::runtime_error("Model::benchmark: mla-rt was not found in PATH");
-    }
-    mla_rt = executable;
-    g_free(executable);
   } else {
     shared.lock();
   }
@@ -469,9 +469,10 @@ BenchmarkReport internal::run_benchmark(Model& model, const BenchmarkOptions& op
     }
 
     TelemetryMonitor telemetry_monitor;
-    telemetry_monitor.start();
+    internal::TelemetryMonitorAccess::prepare_benchmark(telemetry_monitor);
     MeasureScope measure = runner.start_measurement(make_benchmark_measure_options(
         kTimeoutMs, logical_batch_size, include_plugin_latency, "NEAT Benchmark throughput"));
+    internal::TelemetryMonitorAccess::arm_benchmark(telemetry_monitor);
     const auto min_end =
         std::chrono::steady_clock::now() + std::chrono::milliseconds(options.min_duration_ms);
 
@@ -556,7 +557,9 @@ BenchmarkReport internal::run_benchmark(Model& model, const BenchmarkOptions& op
       throw std::runtime_error("Model::benchmark: async measured output count mismatch");
     }
 
-    // Stop timing before the monitor's final Sentinel request.
+    // Seal without joining or contacting Sentinel while the model timer runs.
+    // The final poll and worker teardown belong after the throughput window.
+    internal::TelemetryMonitorAccess::seal_benchmark(telemetry_monitor);
     throughput_measured = measure.stop();
     telemetry = telemetry_monitor.stop();
     runner.close();
@@ -566,7 +569,7 @@ BenchmarkReport internal::run_benchmark(Model& model, const BenchmarkOptions& op
       latency_measured, throughput_measured, num_samples, latency_samples, pushed,
       std::move(telemetry));
   if (options.include_layer_stats) {
-    report.layer_stats = collect_mla_layer_stats(profile_stages, mla_rt);
+    report.layer_stats = collect_mla_layer_stats(profile_stages);
   }
   const double batch_throughput = throughput_measured.throughput_batches_per_s;
   const Telemetry& board = report.telemetry;
