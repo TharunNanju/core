@@ -396,7 +396,8 @@ BenchmarkReport internal::run_benchmark(Model& model, const BenchmarkOptions& op
     if (!contract) {
       throw std::runtime_error("Model::benchmark: layer profiling requires an MPK manifest");
     }
-    profile_stages = resolve_layer_profile_stages(*contract);
+    const auto selected = ModelAccess::pack(model).mla_profile_plugin_indices();
+    profile_stages = resolve_layer_profile_stages(*contract, selected);
   } else {
     shared.lock();
   }

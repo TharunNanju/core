@@ -475,32 +475,13 @@ that fails, the installer warns and continues; run `sima-cli neat install sentin
 `Run` power monitor (`RunOptions::power_monitor`) also comes from Sentinel: Core polls its latest
 sample and reads no power monitor chips over I2C.
 
-Layer profiling is opt-in through `BenchmarkOptions::include_layer_stats`, which defaults to
-false. It requires an idle DevKit with no overlapping MLA workloads. The benchmark gate
-serializes benchmark calls, not other inference APIs or applications. After its latency and
-throughput runners close, Core asks Scheduler to run the installed `mla-rt` CLI on demand for
-each MLA stage. There is no persistent profiling worker. Core owns MPK stage selection,
-independent compiler-YAML/report validation, and customer report fields; Scheduler owns the
-CLI process and temporary files; MLA-RT owns hardware profiling and the handoff back to kernel
-execution. Runner's ordinary inference path is unchanged. Profiling uses separate provider
-inputs, not the benchmark input buffers.
+Layer profiling is opt-in through `BenchmarkOptions::include_layer_stats` (default false). Use an idle DevKit with no overlapping MLA work: the benchmark gate serializes benchmark calls, not other inference APIs or applications. After latency and throughput runners close, Core profiles only MLA stages in the resolved inference route, including its terminal policy, while preserving original MPK executable-stage indices. Core validates compiler YAML and report data; Scheduler owns the on-demand CLI process and temporary files; MLA-RT owns hardware execution and cleanup. Ordinary Runner inference is unchanged. Profiling uses separate provider inputs, not benchmark input buffers.
 
-Scheduler checks that `mla-rt` is executable in `PATH` and that this process has no active
-or recovery-required offline diagnostic before benchmark inference. This check does not validate CLI feature
-compatibility; unsupported options fail the profiling request with CLI diagnostics.
-A host timeout is not device retirement. After a timeout or unknown completion, keep MLA idle
-until recovery is verified. Scheduler does not kill a CLI that may still own device resources.
-Core neither launches nor kills the CLI, and does not substitute whole-job counters for
-per-layer measurements. Successful profiling requires a normal CLI exit and a valid report;
-the provider must finish hardware execution before releasing its resources.
+Scheduler checks for `mla-rt`, then the packaged `modalix-mla-rt`, in `PATH` and checks its process-local diagnostic state. It waits synchronously until the CLI finishes; there is no parent deadline or forced termination. The request `timeout` only configures the provider's `--model-timeout`. This is not a device-completion guarantee. A busy diagnostic or uncertain completion remains fatal: keep MLA idle until recovery is verified. Executable discovery does not validate CLI feature compatibility.
 
-`BenchmarkReport::layer_stats` contains compiled layer names, zero-based executable stage
-indices, and execution times in microseconds. These measurements use separate profiling
-passes and do not sum to headline latency. `BenchmarkReport::save(file_path)` explicitly
-writes the complete report using the public field names and units: `.json` selects JSON;
-`.yaml` and other endings select YAML. It includes telemetry and an empty layer list when
-profiling is disabled. It creates missing parent directories and atomically replaces an
-existing destination.
+`BenchmarkReport::layer_stats` contains compiled layer names, original zero-based executable-stage indices and execution times in microseconds. Profiling failures throw; partial rows are never returned. These separate passes do not sum to headline latency. `save(file_path)` writes telemetry and layer rows as JSON (`.json`) or YAML (other endings), creating missing parent directories and atomically replacing the destination.
+
+Retired PreparedRunner options must remain at their defaults. Use `processcvu.async` and `GraphOptions::async_queue_depth` for concurrency; the legacy dequantization and profiling flags have no direct replacement. Leave `advanced_execution.defer_output_cache_sync=true` and use Tensor/GstMemory CPU mapping when accessing outputs. `RunOptions::advanced.prepare_output_cpu_visible` remains a compatibility no-op; it does not request eager cache synchronization.
 
 ### Compiled model execution contract
 

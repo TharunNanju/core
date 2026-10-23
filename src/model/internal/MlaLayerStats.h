@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <cstdint>
 #include <map>
+#include <span>
 #include <vector>
 
 namespace simaai::neat::internal {
@@ -31,6 +32,10 @@ struct LayerProfileStage {
 
 std::vector<LayerProfileStage>
 resolve_layer_profile_stages(const pipeline_internal::sima::MpkContract& contract);
+// Select exact MPK plugin identities before opening any executable or stats file.
+std::vector<LayerProfileStage>
+resolve_layer_profile_stages(const pipeline_internal::sima::MpkContract& contract,
+                             std::span<const std::size_t> selected_plugins);
 
 // Check Scheduler's offline diagnostic capability before benchmark inference.
 // Profiling requires an idle DevKit; this does not arbitrate unrelated workloads.

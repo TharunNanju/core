@@ -128,6 +128,23 @@ ProfileRows load_profile_input(const std::filesystem::path& path) {
 
 std::vector<internal::LayerProfileStage>
 internal::resolve_layer_profile_stages(const pipeline_internal::sima::MpkContract& contract) {
+  std::vector<std::size_t> selected;
+  for (std::size_t i = 0; i < contract.plugins.size(); ++i)
+    if (g_ascii_strcasecmp(contract.plugins[i].processor.c_str(), "MLA") == 0)
+      selected.push_back(i);
+  return resolve_layer_profile_stages(contract, selected);
+}
+
+std::vector<internal::LayerProfileStage>
+internal::resolve_layer_profile_stages(const pipeline_internal::sima::MpkContract& contract,
+                                       std::span<const std::size_t> selected_plugins) {
+  std::set<std::size_t> selected(selected_plugins.begin(), selected_plugins.end());
+  if (selected.size() != selected_plugins.size())
+    profile_error("duplicate selected MLA stage identity");
+  for (const auto index : selected)
+    if (index >= contract.plugins.size() ||
+        g_ascii_strcasecmp(contract.plugins[index].processor.c_str(), "MLA") != 0)
+      profile_error("invalid selected MLA stage identity");
   std::vector<LayerProfileStage> stages;
   std::size_t stage_index = 0;
   for (const auto plugin_index : pipeline_internal::sima::plugins_in_execution_order(contract)) {
@@ -136,7 +153,7 @@ internal::resolve_layer_profile_stages(const pipeline_internal::sima::MpkContrac
     if (!is_mla && g_ascii_strcasecmp(plugin.processor.c_str(), "A65") != 0)
       continue;
     const auto current_index = stage_index++;
-    if (!is_mla)
+    if (!is_mla || !selected.erase(plugin_index))
       continue;
     const auto executable = pipeline_internal::sima::static_contract::resolve_mla_executable(
         contract.mpk_json_path, plugin.executable);
@@ -148,8 +165,10 @@ internal::resolve_layer_profile_stages(const pipeline_internal::sima::MpkContrac
       profile_error("missing matching stats YAML: " + stats_yaml.string());
     stages.push_back({current_index, executable, stats_yaml, load_profile_input(stats_yaml)});
   }
+  if (!selected.empty())
+    profile_error("selected MLA stage is absent from execution order");
   if (stages.empty())
-    profile_error("model has no MLA stages to profile");
+    profile_error("selected inference route has no MLA stages to profile");
   return stages;
 }
 
