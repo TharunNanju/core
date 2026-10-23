@@ -30,7 +30,7 @@ Scheduler 與 Core 都不維護韌體 ID 或逐操作派送表。Core 保留公�
 與線路格式處理。Scheduler 在套件組驗證後具體化新的轉接器／解析器工廠。
 快取的動態選擇保留其操作，但會綁定目前影格的記憶體。
 
-GenAI 直接呼叫 LLiMa，不經過 Runner 或 Scheduler GenAI 配接器。離線 MLA 各層剖析是獨立且預設停用的流程，透過 Scheduler 視需要執行的 `mla-rt` CLI 整合進行。它需要沒有其他 MLA 工作的閒置 DevKit。Core 將 CLI 執行留在 Scheduler 邊界內，不會自行啟動剖析程序。
+GenAI 直接呼叫 LLiMa，不經過 Runner 或 Scheduler GenAI 配接器。MLA 剖析是獨立且預設停用的流程：Core 呼叫 Scheduler 的用戶端，由 Runner 執行已安裝的 `mla-rt` 命令列工具。它需要沒有其他 MLA 工作的閒置 DevKit。
 
 ---
 
@@ -350,11 +350,13 @@ input Sample/Tensor
 
 Sentinel 約每 2 秒取樣一次，因此吞吐量階段至少會執行 `BenchmarkOptions::min_duration_ms`（預設為 10 秒）。延遲階段也遵循相同的下限，因此兩個階段依相同規則停止。當 Sentinel 未執行或量測期間沒有樣本時，基準測試仍會傳回延遲與 FPS；功耗欄位為零，並由 `telemetry.status` 說明原因。`tools/install_neat_framework.sh` 的板子模式會安裝 Sentinel，或將其升級至最新的正式版建置。若安裝失敗，安裝程式會發出警告並繼續；之後可執行 `sima-cli neat install sentinel`，或像 CI 一樣設定 `NEAT_INSTALLER_SENTINEL_REQUIRED=ON`，讓失敗中止安裝。已棄用的 `Run` 電源監控器（`RunOptions::power_monitor`）的資料同樣來自 Sentinel：Core 會輪詢其最新樣本，不會透過 I2C 讀取電源監控晶片。
 
-各層剖析透過 `BenchmarkOptions::include_layer_stats`（預設 false）啟用。請使用沒有其他 MLA 工作的閒置 DevKit；基準測試閘門不會序列化其他推論 API 或應用程式。延遲與吞吐量 Runner 關閉後，Core 只剖析套用終端策略後推論路徑中的 MLA 階段，並保留原始 MPK 執行階段索引。Core 驗證編譯器 YAML 和報告；Scheduler 管理按需啟動的 CLI 與暫存檔；MLA-RT 管理硬體執行與清理。一般 Runner 推論不變，剖析輸入也不同於基準測試輸入。
+MLA 剖析透過兩個預設為 false 的 `BenchmarkOptions` 欄位明確啟用：`include_mla_layer_stats` 與 `include_mla_stage_stats`。延遲與吞吐量執行器關閉後，Core 會透過 Scheduler 的用戶端測量已解壓縮模型的 MLA 執行檔，並依序逐一進行剖析。MLA 層統計只涵蓋所選推論路徑（含其終端政策）中的 MLA 階段。Runner 會為每個執行檔在獨立程序中執行 `mla-rt`。MLA 層統計還會使用編譯器統計 YAML；MLA 階段統計會將每個 MLA 執行檔連續不中斷執行 200 次，並從 `mla-rt` 統計檔讀取 `tile.lat` 平均值。Runner 負責驗證輸入與輸出並清理暫存檔；若單次執行超過 120 秒，它會停止 `mla-rt`。MLA-RT 負責硬體剖析，以及將控制權交回核心執行路徑。剖析不得與其他 MLA 工作負載重疊。基準測試閘門只會序列化基準測試呼叫，不涵蓋其他推論 API 或應用程式。
 
-Scheduler 先在 `PATH` 尋找 `mla-rt`，再尋找套件提供的 `modalix-mla-rt`，並檢查程序內的診斷狀態。它同步等待 CLI 結束，沒有父程序期限或強制終止。請求的 `timeout` 只設定提供者的 `--model-timeout`，不保證裝置已完成。診斷忙碌或完成狀態不明仍是錯誤；請保持 MLA 閒置直到確認復原。找到執行檔不代表已驗證 CLI 功能相容性。
+已停止或當機的 `mla-rt` 執行可能讓 MLA 工作未完成，因此 Runner 不會在該程序中再啟動 `mla-rt`。之後的剖析流程會回報 MLA 需要復原。在確認 MLA 已復原之前，請讓 DevKit 保持閒置。
 
-`BenchmarkReport::layer_stats` 包含編譯後的層名稱、原始從零開始的執行階段索引，以及微秒執行時間。剖析失敗會擲出例外，不會傳回部分結果。獨立剖析結果的總和不等於主要延遲。`save(file_path)` 將遙測和各層資料寫為 JSON（`.json`）或 YAML（其他副檔名），建立父目錄並以原子方式取代目的檔。
+剖析採盡力而為（best effort）方式。若找不到 `mla-rt`、其執行失敗、逾時或寫出無法使用的輸出，Core 會保留主要測量值，讓對應清單保持為空，印出警告，並將原因寫入 `mla_layer_stats.status` 或 `mla_stage_stats.status`。其他情況下，狀態為 `"not requested"` 或 `"ok"`。
+
+`BenchmarkReport::mla_layer_stats` 包含每個已編譯 MLA 層從零開始的執行階段索引、名稱，以及每層以一次剖析階段測得、以微秒表示的硬體延遲。`BenchmarkReport::mla_stage_stats` 包含以相同方式編號的各 MLA 階段索引，以及以微秒表示的平均硬體延遲。這些測量使用獨立的剖析階段，因此各層延遲的總和不等於階段延遲，也不等於整體延遲。`BenchmarkReport::save(file_path)` 會使用公開欄位名稱與單位，明確寫入完整報告：`.json` 選擇 JSON；`.yaml` 與其他結尾選擇 YAML。報告包含遙測資料與兩個狀態；停用剖析時，MLA 清單為空。此方法會建立不存在的父目錄，並以原子方式取代既有的目標檔案。
 
 已淘汰的 PreparedRunner 選項必須維持預設值。並行處理使用 `processcvu.async` 和 `GraphOptions::async_queue_depth`；舊反量化與剖析旗標沒有直接替代。請維持 `advanced_execution.defer_output_cache_sync=true`，並透過 Tensor/GstMemory 映射存取 CPU 輸出。`RunOptions::advanced.prepare_output_cpu_visible` 是相容性用的無作用欄位，不要求預先快取同步。
 

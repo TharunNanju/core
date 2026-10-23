@@ -36,10 +36,9 @@ node APIs, geometry policy and wire formatting. Fresh adapter/resolver factories
 are instantiated by Scheduler after cohort validation. A cached dynamic
 selection retains its operation but binds the current frame's memory.
 
-GenAI calls LLiMa directly, not through Runner or a Scheduler GenAI adapter. Offline MLA layer
-profiling is a separate, default-off pass through Scheduler's on-demand `mla-rt` CLI integration.
-It requires an idle DevKit with no other MLA work. Core keeps CLI execution behind Scheduler's
-boundary and does not launch a profiling process itself.
+GenAI calls LLiMa directly, not through Runner or a Scheduler GenAI adapter. MLA profiling is
+a separate, default-off pass: Core calls Scheduler's client, and Runner runs the installed `mla-rt`
+command-line tool. It requires an idle DevKit with no other MLA work.
 
 ---
 
@@ -475,11 +474,36 @@ that fails, the installer warns and continues; run `sima-cli neat install sentin
 `Run` power monitor (`RunOptions::power_monitor`) also comes from Sentinel: Core polls its latest
 sample and reads no power monitor chips over I2C.
 
-Layer profiling is opt-in through `BenchmarkOptions::include_layer_stats` (default false). Use an idle DevKit with no overlapping MLA work: the benchmark gate serializes benchmark calls, not other inference APIs or applications. After latency and throughput runners close, Core profiles only MLA stages in the resolved inference route, including its terminal policy, while preserving original MPK executable-stage indices. Core validates compiler YAML and report data; Scheduler owns the on-demand CLI process and temporary files; MLA-RT owns hardware execution and cleanup. Ordinary Runner inference is unchanged. Profiling uses separate provider inputs, not benchmark input buffers.
+MLA profiling is opt-in through two `BenchmarkOptions` fields that default to false:
+`include_mla_layer_stats` and `include_mla_stage_stats`. After the latency and throughput runners
+close, Core measures the extracted model's MLA executables through Scheduler's client, one
+profiling pass after the other. MLA layer stats covers only the MLA stages in the resolved
+inference route, including its terminal policy. Runner runs `mla-rt` in a separate process for
+each executable. MLA layer stats also uses the compiler stats YAML; MLA stage stats runs each MLA
+executable 200 times without interruption and reads the mean `tile.lat` from the `mla-rt` stats file. Runner
+validates the inputs and outputs and removes temporary files; it stops `mla-rt` if one run takes
+longer than 120 s. MLA-RT owns hardware profiling and the handoff back to
+kernel execution. Profiling requires no overlapping MLA workloads. The benchmark gate serializes
+benchmark calls, not other inference APIs or applications.
 
-Scheduler checks for `mla-rt`, then the packaged `modalix-mla-rt`, in `PATH` and checks its process-local diagnostic state. It waits synchronously until the CLI finishes; there is no parent deadline or forced termination. The request `timeout` only configures the provider's `--model-timeout`. This is not a device-completion guarantee. A busy diagnostic or uncertain completion remains fatal: keep MLA idle until recovery is verified. Executable discovery does not validate CLI feature compatibility.
+A stopped or crashed `mla-rt` run may leave MLA work unfinished, so Runner starts no further `mla-rt`
+run in that process. Later profiling passes report that MLA needs recovery. Keep the DevKit idle
+until MLA recovery is verified.
 
-`BenchmarkReport::layer_stats` contains compiled layer names, original zero-based executable-stage indices and execution times in microseconds. Profiling failures throw; partial rows are never returned. These separate passes do not sum to headline latency. `save(file_path)` writes telemetry and layer rows as JSON (`.json`) or YAML (other endings), creating missing parent directories and atomically replacing the destination.
+Profiling is best effort. When `mla-rt` is missing, fails, times out, or writes unusable output,
+Core keeps the headline measurements, leaves that list empty, prints a warning, and sets
+`mla_layer_stats.status` or `mla_stage_stats.status` to the reason. A status is otherwise
+`"not requested"` or `"ok"`.
+
+`BenchmarkReport::mla_layer_stats` contains each compiled MLA layer's zero-based executable
+stage index, name, and hardware latency in microseconds from one profiling pass per layer.
+`BenchmarkReport::mla_stage_stats` contains each MLA stage's index, numbered the same way, and its
+mean hardware latency in microseconds. These measurements use separate profiling passes, so layer
+latencies do not sum to the stage or headline latency.
+`BenchmarkReport::save(file_path)` explicitly writes the complete report using the public field
+names and units: `.json` selects JSON; `.yaml` and other endings select YAML. It includes
+telemetry, both statuses, and empty MLA lists when profiling is disabled. It creates missing
+parent directories and atomically replaces an existing destination.
 
 Retired PreparedRunner options must remain at their defaults. Use `processcvu.async` and `GraphOptions::async_queue_depth` for concurrency; the legacy dequantization and profiling flags have no direct replacement. Leave `advanced_execution.defer_output_cache_sync=true` and use Tensor/GstMemory CPU mapping when accessing outputs. `RunOptions::advanced.prepare_output_cpu_visible` remains a compatibility no-op; it does not request eager cache synchronization.
 
