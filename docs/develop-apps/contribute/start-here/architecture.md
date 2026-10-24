@@ -2271,3 +2271,7 @@ Keep docs and code aligned:
 * If you add new env knobs, add them to the "Environment / configuration knobs" section.
 
 ---
+
+## Native MLA tensor views
+
+Core reuses shared backing memory slots while retaining producer leases and skips shared descriptor imports for mixed-owner inputs. Proven identity host modules preserve native output types and shapes without A65 execution, including INT32 ArgMax results and cold `Model::output_specs()` metadata.
