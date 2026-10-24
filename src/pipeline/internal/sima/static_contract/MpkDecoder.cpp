@@ -456,7 +456,7 @@ bool mla_input_extent_matches(const ValueSpec& value, const std::uint64_t physic
                                  ? dense_bytes(*value.logical_shape, *value.logical_dtype)
                                  : std::nullopt;
   const auto aligned_bytes = align_up_16(value.required_bytes);
-  // Allocation tail padding does not enlarge the logical input transfer.
+  // Allocation tail padding does not enlarge the logical tensor payload.
   return transfer_bytes == value.required_bytes &&
          value.representation == ValueRepresentation::Dense && !value.read_expression &&
          value.logical_shape && !value.logical_shape->empty() &&
@@ -2216,7 +2216,7 @@ MpkDecodeResult decode_impl(const std::string_view text,
       for (std::size_t index = 0; index < mla.inputs.size(); ++index) {
         const std::string symbol =
             topology.monolithic_ifm ? "data.ifm.b0" : topology.ifm_symbol_names.at(index);
-        const auto& value = data.values[mla.inputs[input_order[index]]];
+        auto& value = data.values[mla.inputs[input_order[index]]];
         const auto physical_extent = mla_elf_ifm_extent_bytes(topology, index);
         const auto transfer_bytes =
             value.storage_binding && value.storage_binding->channel_alignment > 1U
@@ -2233,9 +2233,22 @@ MpkDecodeResult decode_impl(const std::string_view text,
           result.proof.push_back({"MLA.IFM[" + std::to_string(index) + "].layout",
                                   "typed dense logical bytes and ELF extent prove exact 16-byte "
                                   "allocation tail padding"});
+          if (!value.storage_binding &&
+              std::find(data.model_inputs.begin(), data.model_inputs.end(), value.id) !=
+                  data.model_inputs.end()) {
+            StorageBinding binding;
+            binding.kind = StorageBindingKind::External;
+            binding.carrier_id = value.id;
+            binding.physical_span = physical_extent;
+            binding.access = StorageAccess::ReadOnly;
+            value.storage_binding = std::move(binding);
+          }
         }
+        // MLA-RT can access the full ELF reservation, including a proved dense
+        // allocation tail. Keep the MPK value logical, but reserve and project
+        // that complete readable range through the producer's frame carrier.
         data.backend_ports.push_back({stage_index, BackendPortDirection::Input, index, symbol,
-                                      value.id, transfer_bytes, kLegacyEvoCmaRegionAlignmentBytes,
+                                      value.id, physical_extent, kLegacyEvoCmaRegionAlignmentBytes,
                                       BackendPortAlignmentAuthority::LegacyPolicy,
                                       BackendPortAccess::ReadOnly});
         data.backend_ports.back().logical_port_index = input_order[index];
