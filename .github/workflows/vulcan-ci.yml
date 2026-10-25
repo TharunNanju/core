@@ -143,6 +143,7 @@ jobs:
             tests/tools/test_ci_hygiene_cohort.py \
             tests/tools/test_published_artifact.py \
             tests/tools/test_ci_dependency_setup.py \
+            tests/tools/test_scheduler_sdk_policy.py \
             tests/tools/test_guarded_ctest_configuration.py \
             tests/tools/test_codec_stream_registration.py \
             tests/tools/test_vulcan_ci_docs_only.py \
@@ -284,10 +285,21 @@ jobs:
     if: ${{ (inputs.build_mode || 'standard') == 'standard' && needs.detect-changes.outputs.docs_only != 'true' }}
     needs:
       - detect-changes
+      - resolve-vulcan-config
+      - build
     uses: sima-neat/.github/.github/workflows/vulcan-resolve-modalix-runner.yml@main
     with:
+      manifest_artifact: neat-core-dist
+      manifest_path: scheduler-sdk-policy.json
       legacy_runner_group: modalix-devkit
       versioned_runner_group_prefix: modalix-devkit-
+      shared_workflow_ref: main
+      allow-version-fallback: false
+      runner-labels: >-
+        ["self-hosted", "Linux", "ARM64", "modalix", "rtsp", "vulcan-${{ needs.resolve-vulcan-config.outputs.vulcan_env == 'prod' && 'production' || needs.resolve-vulcan-config.outputs.vulcan_env }}"]
+    secrets:
+      app_id: ${{ secrets.NEAT_RELEASES_APP_ID }}
+      app_private_key: ${{ secrets.NEAT_RELEASES_APP_PRIVATE_KEY }}
 
   build:
     name: Build Core on Vulcan
@@ -361,6 +373,11 @@ jobs:
         [[ ${#sdk_images[@]} == 1 ]]
         sdk_image_id=$(docker image inspect --format '{{.Id}}' "${sdk_images[0]}")
         [[ "$(docker inspect --format '{{.Image}}' "$sdk_container")" == "$sdk_image_id" ]]
+
+        # Finish cached SDK package configuration before build.sh invokes APT.
+        # This affects the verified SDK container, not the host or target sysroot.
+        docker exec --user root -e DEBIAN_FRONTEND=noninteractive \
+          "${sdk_container}" dpkg --configure -a
 
         docker exec \
           -e SIMA_CLI_CHECK_FOR_UPDATE=0 \
@@ -742,12 +759,35 @@ jobs:
     runs-on:
       group: ${{ needs.resolve-test-runner.outputs.modalix_runner_group }}
       # The dedicated production DevKit uses vulcan-production, not vulcan-prod.
-      labels: [self-hosted, Linux, ARM64, modalix, rtsp, "vulcan-${{ needs.resolve-vulcan-config.outputs.vulcan_env == 'prod' && 'production' || needs.resolve-vulcan-config.outputs.vulcan_env }}"]
+      labels: ${{ fromJSON(needs.resolve-test-runner.outputs.runner_labels) }}
     env:
       VULCAN_ENV: ${{ needs.resolve-vulcan-config.outputs.vulcan_env }}
       SIMA_CLI_CHECK_FOR_UPDATE: "0"
 
     steps:
+      - name: Verify selected DevKit firmware
+        env:
+          EXPECTED_ELXR_VERSION: ${{ needs.resolve-test-runner.outputs.elxr_version }}
+          VERSION_FALLBACK: ${{ needs.resolve-test-runner.outputs.version_fallback }}
+        shell: bash
+        run: |
+          python3 - <<'PYFIRMWARE'
+          import os
+          import re
+          from pathlib import Path
+
+          actual_versions = set()
+          for path in (Path('/etc/build'), Path('/etc/buildinfo')):
+              if path.is_file():
+                  actual_versions.update(re.findall(
+                      r'^SIMA_BUILD_VERSION\s*=\s*([\w.\-+]+)\s*$',
+                      path.read_text(), re.MULTILINE))
+          expected = os.environ['EXPECTED_ELXR_VERSION']
+          print(f"Runner: {os.environ['RUNNER_NAME']}; requested firmware: {expected}; actual firmware: {sorted(actual_versions)}")
+          if (not expected or os.environ['VERSION_FALLBACK'] != 'false'
+                  or actual_versions != {expected}):
+              raise SystemExit('Cannot verify exact DevKit firmware; refusing to run')
+          PYFIRMWARE
       - name: Checkout code
         uses: actions/checkout@v5
         with:
