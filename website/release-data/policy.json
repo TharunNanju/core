@@ -253,63 +253,63 @@
     },
     {
       "path": "docs/getting-started/dev-environment/offline-installation.md",
-      "line": "SDK offline packages are supported for SDK 2.1.3.0 or later.",
+      "line": "| Neat SDK | Set up the SDK development environment. | SDK 2.1.3.0 or later |",
       "count": 1,
-      "reason": "Historical compatibility or version-specific example/minimum requirement"
+      "reason": "Minimum supported offline package version"
     },
     {
       "path": "docs/getting-started/dev-environment/offline-installation.md",
-      "line": "Model Compiler offline packages are supported for Model Compiler 2.1.3 or later.",
+      "line": "| Model Compiler | Install Model Compiler in the SDK or on a standalone host. | Model Compiler 2.1.3 or later |",
       "count": 1,
-      "reason": "Historical compatibility or version-specific example/minimum requirement"
+      "reason": "Minimum supported offline package version"
     },
     {
       "path": "website/i18n/ko/docusaurus-plugin-content-docs/current/getting-started/dev-environment/offline-installation.md",
-      "line": "SDK 버전 2.1.3.0 이상에서는 SDK 오프라인 패키지를 지원합니다.",
+      "line": "| Neat SDK | SDK 개발 환경을 설정합니다. | SDK 2.1.3.0 이상 |",
       "count": 1,
-      "reason": "Historical compatibility or version-specific example/minimum requirement"
+      "reason": "Minimum supported offline package version"
     },
     {
       "path": "website/i18n/ko/docusaurus-plugin-content-docs/current/getting-started/dev-environment/offline-installation.md",
-      "line": "Model Compiler의 오프라인 패키지는 Model Compiler 2.1.3 버전 이상에서 지원됩니다.",
+      "line": "| Model Compiler | SDK 또는 독립 실행형 호스트에 Model Compiler를 설치합니다. | Model Compiler 2.1.3 이상 |",
       "count": 1,
-      "reason": "Historical compatibility or version-specific example/minimum requirement"
+      "reason": "Minimum supported offline package version"
     },
     {
       "path": "website/i18n/ja/docusaurus-plugin-content-docs/current/getting-started/dev-environment/offline-installation.md",
-      "line": "SDK 2.1.3.0 以降のバージョンでは、SDKオフラインパッケージがサポートされます。",
+      "line": "| Neat SDK | SDK 開発環境をセットアップします。 | SDK 2.1.3.0 以降 |",
       "count": 1,
-      "reason": "Historical compatibility or version-specific example/minimum requirement"
+      "reason": "Minimum supported offline package version"
     },
     {
       "path": "website/i18n/ja/docusaurus-plugin-content-docs/current/getting-started/dev-environment/offline-installation.md",
-      "line": "Model Compilerのオフラインパッケージは、Model Compiler 2.1.3以降のバージョンでサポートされています。",
+      "line": "| Model Compiler | SDK 内またはスタンドアロンホストに Model Compiler をインストールします。 | Model Compiler 2.1.3 以降 |",
       "count": 1,
-      "reason": "Historical compatibility or version-specific example/minimum requirement"
+      "reason": "Minimum supported offline package version"
     },
     {
       "path": "website/i18n/zh-Hant/docusaurus-plugin-content-docs/current/getting-started/dev-environment/offline-installation.md",
-      "line": "SDK 2.1.3.0 或更高版本的離線套件受到支援。",
+      "line": "| Neat SDK | 設定 SDK 開發環境。 | SDK 2.1.3.0 或更新版本 |",
       "count": 1,
-      "reason": "Historical compatibility or version-specific example/minimum requirement"
+      "reason": "Minimum supported offline package version"
     },
     {
       "path": "website/i18n/zh-Hant/docusaurus-plugin-content-docs/current/getting-started/dev-environment/offline-installation.md",
-      "line": "針對 Model Compiler 2.1.3 或更新版本，我們支援使用 Model Compiler 的離線套件。",
+      "line": "| Model Compiler | 在 SDK 中或獨立主機上安裝 Model Compiler。 | Model Compiler 2.1.3 或更新版本 |",
       "count": 1,
-      "reason": "Historical compatibility or version-specific example/minimum requirement"
+      "reason": "Minimum supported offline package version"
     },
     {
       "path": "website/i18n/uk/docusaurus-plugin-content-docs/current/getting-started/dev-environment/offline-installation.md",
-      "line": "Офлайн-пакети SDK підтримуються для SDK версії 2.1.3.0 або новішої.",
+      "line": "| Neat SDK | Налаштування середовища розробки SDK. | SDK 2.1.3.0 або новішої версії |",
       "count": 1,
-      "reason": "Historical compatibility or version-specific example/minimum requirement"
+      "reason": "Minimum supported offline package version"
     },
     {
       "path": "website/i18n/uk/docusaurus-plugin-content-docs/current/getting-started/dev-environment/offline-installation.md",
-      "line": "Офлайн-пакети підтримуються для Model Compiler, версії 2.1.3 або новішої, для Model Compiler.",
+      "line": "| Model Compiler | Встановлення Model Compiler у SDK або на окремому хості. | Model Compiler 2.1.3 або новішої версії |",
       "count": 1,
-      "reason": "Historical compatibility or version-specific example/minimum requirement"
+      "reason": "Minimum supported offline package version"
     },
     {
       "path": "docs/getting-started/dev-environment/index.md",
@@ -400,6 +400,96 @@
       "line": "Після ввімкнення ICS, Windows зазвичай призначає спільному адаптеру адресу в мережі `192.168.137.0/24`.",
       "count": 1,
       "reason": "Network address example, not a release version"
+    },
+    {
+      "path": "docs/getting-started/neat-library/pcie-host.mdx",
+      "line": "Neat PCIe offline packages are available in version 0.6.0 or later.",
+      "count": 1,
+      "reason": "Minimum supported offline package version"
+    },
+    {
+      "path": "docs/getting-started/neat-library/pcie-host.mdx",
+      "line": "Select version 0.6.0 or later for the target host.",
+      "count": 1,
+      "reason": "Minimum supported offline package version"
+    },
+    {
+      "path": "docs/getting-started/neat-library/install-or-update.mdx",
+      "line": "Neat Library offline packages are available in version 0.6.0 or later.",
+      "count": 1,
+      "reason": "Minimum supported offline package version"
+    },
+    {
+      "path": "website/i18n/zh-Hant/docusaurus-plugin-content-docs/current/getting-started/neat-library/pcie-host.mdx",
+      "line": "Neat PCIe 離線套件自 0.6.0 版本起提供。",
+      "count": 1,
+      "reason": "Minimum supported offline package version"
+    },
+    {
+      "path": "website/i18n/zh-Hant/docusaurus-plugin-content-docs/current/getting-started/neat-library/pcie-host.mdx",
+      "line": "選擇適用於目標主機的 0.6.0 或更新版本。",
+      "count": 1,
+      "reason": "Minimum supported offline package version"
+    },
+    {
+      "path": "website/i18n/zh-Hant/docusaurus-plugin-content-docs/current/getting-started/neat-library/install-or-update.mdx",
+      "line": "Neat Library 離線套件自 0.6.0 版本起提供。",
+      "count": 1,
+      "reason": "Minimum supported offline package version"
+    },
+    {
+      "path": "website/i18n/ja/docusaurus-plugin-content-docs/current/getting-started/neat-library/pcie-host.mdx",
+      "line": "Neat PCIe オフラインパッケージは、バージョン 0.6.0 以降で利用できます。",
+      "count": 1,
+      "reason": "Minimum supported offline package version"
+    },
+    {
+      "path": "website/i18n/ja/docusaurus-plugin-content-docs/current/getting-started/neat-library/pcie-host.mdx",
+      "line": "対象ホスト用のバージョン 0.6.0 以降を選択してください。",
+      "count": 1,
+      "reason": "Minimum supported offline package version"
+    },
+    {
+      "path": "website/i18n/ja/docusaurus-plugin-content-docs/current/getting-started/neat-library/install-or-update.mdx",
+      "line": "Neat Library オフラインパッケージは、バージョン 0.6.0 以降で利用できます。",
+      "count": 1,
+      "reason": "Minimum supported offline package version"
+    },
+    {
+      "path": "website/i18n/uk/docusaurus-plugin-content-docs/current/getting-started/neat-library/pcie-host.mdx",
+      "line": "Автономні пакети Neat PCIe доступні у версії 0.6.0 або новішій.",
+      "count": 1,
+      "reason": "Minimum supported offline package version"
+    },
+    {
+      "path": "website/i18n/uk/docusaurus-plugin-content-docs/current/getting-started/neat-library/pcie-host.mdx",
+      "line": "Виберіть версію 0.6.0 або новішу для цільового хоста.",
+      "count": 1,
+      "reason": "Minimum supported offline package version"
+    },
+    {
+      "path": "website/i18n/uk/docusaurus-plugin-content-docs/current/getting-started/neat-library/install-or-update.mdx",
+      "line": "Автономні пакети Neat Library доступні у версії 0.6.0 або новішій.",
+      "count": 1,
+      "reason": "Minimum supported offline package version"
+    },
+    {
+      "path": "website/i18n/ko/docusaurus-plugin-content-docs/current/getting-started/neat-library/pcie-host.mdx",
+      "line": "Neat PCIe 오프라인 패키지는 0.6.0 이상 버전에서 사용할 수 있습니다.",
+      "count": 1,
+      "reason": "Minimum supported offline package version"
+    },
+    {
+      "path": "website/i18n/ko/docusaurus-plugin-content-docs/current/getting-started/neat-library/pcie-host.mdx",
+      "line": "대상 호스트에 맞는 0.6.0 이상 버전을 선택하세요.",
+      "count": 1,
+      "reason": "Minimum supported offline package version"
+    },
+    {
+      "path": "website/i18n/ko/docusaurus-plugin-content-docs/current/getting-started/neat-library/install-or-update.mdx",
+      "line": "Neat Library 오프라인 패키지는 0.6.0 이상 버전에서 사용할 수 있습니다.",
+      "count": 1,
+      "reason": "Minimum supported offline package version"
     }
   ],
   "readmes": [
