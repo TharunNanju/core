@@ -291,6 +291,7 @@ def orchestrate(cards, snapshot, operations, preflight_only=False, progress=None
                 report['host'] = 'verification_failed'
                 perform('Rechecking host health...', operations.host, 'verify')
                 report['host'] = 'installed_verified'
+        stable()
     except (OSError, ValueError, subprocess.SubprocessError, KeyboardInterrupt) as exc:
         report['errors'].append(str(exc) or 'Installation interrupted; check card outcomes before retrying')
     finally:

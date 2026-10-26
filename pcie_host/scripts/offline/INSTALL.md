@@ -1,7 +1,9 @@
 # Install the offline Neat PCIe bundle
 
-This installs Neat on an Ubuntu 24.04 amd64 host and every attached compatible
-Platform 3.0 card. It does not convert firmware or install the host driver.
+This installs Neat on an Ubuntu 22.04 or 24.04 host (`amd64` or `arm64`) and
+every attached compatible Platform 3.0 ARM64 card. Select the bundle matching
+the host operating system and architecture. It does not convert firmware or
+install the host driver.
 
 ## Prepare the system
 
@@ -12,7 +14,11 @@ and library architecture/exports without requiring Platform DEB registration.
 Older Scheduler publications with hard Platform DEB dependencies must be rebuilt
 with that producer correction, not modified after publication.
 Every card needs a working discovery responder on its PCIe interface, a unique
-PCIe IPv4 address, Python 3, and SSH access. The host needs Python 3.11 or later,
+PCIe IPv4 address, system Python 3, and SSH access. Use the host and card system
+interpreters matching the Python ABIs recorded in the bundle's
+`host/dependencies.json` and `card/dependencies.json`. Preflight rejects a
+mismatch; installing an arbitrary newer Python does not satisfy this requirement.
+The host also needs
 `ip`, OpenSSH, `sudo`, `timeout`, and `unshare`; cards need `sudo`, `flock`,
 `timeout`, and `unshare`.
 The SSH account must have sudo access. Use passwordless sudo or pass
