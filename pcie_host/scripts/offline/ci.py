@@ -118,8 +118,7 @@ def source_metadata(args, work):
 
 
 def baseline_dependencies(record, role):
-    names = ({'simaai-scheduler.deb', 'resolved-deps-manifest.json', 'scheduler_platform_admission.py'}
-             if role == 'card' else {'platform_provider.py', 'platform-source.json'})
+    names = {'platform_provider.py', 'platform-source.json'}
     checksums = record['resources-checksum']
     if not names <= set(checksums):
         raise ValueError('publication lacks baseline provenance: '+role)
@@ -143,16 +142,24 @@ def baseline_identity(role, dependencies):
 
 def pull_baseline(args, role, record):
     config = baseline_config()
-    key = baseline_identity(role, baseline_dependencies(record, role))
-    tag = config['repository']+':offline-'+role+'-'+key
-    result = subprocess.run(['docker', 'manifest', 'inspect', '--verbose', tag], capture_output=True, text=True)
-    if result.returncode:
-        raise RuntimeError('Cannot resolve clean baseline '+role+'. Publish matching images with Vulcan '
-                           'Build reusable Ubuntu images (offline_source_sha='+args.sha+'). '+result.stderr)
-    manifest = json.loads(result.stdout)
-    digest = manifest.get('Descriptor', {}).get('digest') if isinstance(manifest, dict) else None
-    if not re.fullmatch(r'sha256:[0-9a-f]{64}', digest or ''):
-        raise ValueError('baseline must be a single-platform manifest with a digest')
+    if role == 'card':
+        # The test environment changes with Platform requirements, not with
+        # every rebuilt Scheduler/Runner/Kernels package under test.
+        digest, key = config['card']['digest'], config['card']['inputs_sha256']
+        if (not re.fullmatch(r'sha256:[0-9a-f]{64}', digest)
+                or not re.fullmatch(r'[0-9a-f]{64}', key)):
+            raise ValueError('invalid pinned card baseline identity')
+    else:
+        key = baseline_identity(role, baseline_dependencies(record, role))
+        tag = config['repository']+':offline-'+role+'-'+key
+        result = subprocess.run(['docker', 'manifest', 'inspect', '--verbose', tag], capture_output=True, text=True)
+        if result.returncode:
+            raise RuntimeError('Cannot resolve clean baseline '+role+'. Publish matching images with Vulcan '
+                               'Build reusable Ubuntu images (offline_source_sha='+args.sha+'). '+result.stderr)
+        manifest = json.loads(result.stdout)
+        digest = manifest.get('Descriptor', {}).get('digest') if isinstance(manifest, dict) else None
+        if not re.fullmatch(r'sha256:[0-9a-f]{64}', digest or ''):
+            raise ValueError('baseline must be a single-platform manifest with a digest')
     image = config['repository']+'@'+digest
     print('Pulling Vulcan clean baseline: '+image, flush=True)
     run('docker', 'pull', image)
