@@ -11,6 +11,42 @@ for (const tag of docusaurusConfig.headTags || []) {
   }
 }
 
+const localeRedirect = (docusaurusConfig.headTags || []).find(
+  (tag) => tag.tagName === "script" && String(tag.innerHTML).includes("sima-neat-locale="),
+);
+assert.ok(localeRedirect, "The locale redirect head script must remain testable");
+
+function runLocaleRedirect({cookie, preferredLocale = ""}) {
+  let replaced;
+  vm.runInNewContext(localeRedirect.innerHTML, {
+    URLSearchParams,
+    decodeURIComponent,
+    document: {cookie},
+    window: {
+      __NEAT_DOCS_PREFERRED_LOCALE__: preferredLocale,
+      location: {hash: "", pathname: "/", search: "", replace: (to) => (replaced = to)},
+      sessionStorage: {getItem: () => null, setItem() {}},
+    },
+  });
+  return replaced;
+}
+
+assert.equal(
+  runLocaleRedirect({cookie: "sima-neat-locale=ja"}),
+  "/ja/",
+  "A valid locale cookie must redirect the English entry page",
+);
+assert.equal(
+  runLocaleRedirect({cookie: "sima-neat-locale=%"}),
+  undefined,
+  "A malformed locale cookie must be ignored",
+);
+assert.equal(
+  runLocaleRedirect({cookie: "sima-neat-locale=%E0%A4%A", preferredLocale: "ko"}),
+  "/ko/",
+  "A malformed locale cookie must not block the configured preferred locale",
+);
+
 const clientModule = fs.readFileSync(
   path.resolve(__dirname, "../src/clientModules/i18n-preview.js"),
   "utf8",
