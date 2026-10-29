@@ -947,6 +947,12 @@ target_link_libraries(canonical_visual_stage_test PRIVATE
 set_tests_properties(canonical_visual_stage_test PROPERTIES
   TIMEOUT 90 LABELS "strict;e2e;runtime;kernel-runner;modalix-only")
 
+# 4:2:2 MJPEG decodes to NV16 with pixels matching the same frame as 4:2:0 (NV12).
+add_pipeline_test(mjpeg_422_decode_e2e_test
+  SOURCES e2e_testing/mjpeg_422_decode_e2e_test.cpp LOCK_ACCELERATOR)
+set_tests_properties(mjpeg_422_decode_e2e_test PROPERTIES
+  TIMEOUT 90 LABELS "strict;e2e;runtime;kernel-runner;modalix-only;codec")
+
 # Camera-free Metoak public Graph numerical/ownership regression.
 add_pipeline_test(metoak_depth_ev_test
   SOURCES e2e_testing/metoak_depth_ev_test.cpp LOCK_ACCELERATOR)
