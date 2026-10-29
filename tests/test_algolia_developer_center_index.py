@@ -90,6 +90,55 @@ class LocalizedRecordTests(unittest.TestCase):
                 "/software/ja/tutorials/run-your-first-model",
             )
 
+    def test_localized_record_uses_frontmatter_title_without_h1(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            docs_dir = root / "docs"
+            (docs_dir / "reference").mkdir(parents=True)
+            (docs_dir / "reference" / "env_vars.md").write_text(
+                "---\ntitle: Environment variables\n---\n\nEnglish body.\n",
+                encoding="utf-8",
+            )
+            titles = {
+                "ko": "환경 변수",
+                "ja": "環境変数",
+                "zh-Hant": "環境變數",
+                "uk": "Змінні середовища",
+            }
+            for locale, title in titles.items():
+                localized_dir = root / "i18n" / locale / MODULE.I18N_DOCS_SUBDIR / "reference"
+                localized_dir.mkdir(parents=True)
+                (localized_dir / "env_vars.md").write_text(
+                    f'---\ntitle: "{title}"\n---\n\nLocalized body.\n',
+                    encoding="utf-8",
+                )
+
+            records, _ = MODULE.generate_records(
+                docs_dir,
+                "https://developer.sima.ai",
+                MODULE.DEFAULT_MAX_RECORD_BYTES,
+                root / "i18n",
+            )
+
+            by_language = {record["language"]: record for record in records}
+            self.assertEqual(by_language["en"]["title"], "Environment variables")
+            for locale, title in titles.items():
+                self.assertEqual(by_language[locale]["title"], title)
+                self.assertEqual(by_language[locale]["hierarchy"]["lvl1"], title)
+
+    def test_title_prefers_h1_then_frontmatter_then_filename(self) -> None:
+        path = Path("data_formats.md")
+        self.assertEqual(
+            MODULE.title_from_markdown(path, "# Data formats and tensors\nBody.\n", "Tensor formats"),
+            "Data formats and tensors",
+        )
+        self.assertEqual(
+            MODULE.title_from_markdown(path, "Body.\n", "`Tensor` formats"),
+            "Tensor formats",
+        )
+        self.assertEqual(MODULE.title_from_markdown(path, "Body.\n"), "Data Formats")
+        self.assertEqual(MODULE.title_from_markdown(Path("env-vars.md"), "Body.\n", ""), "Env Vars")
+
 
 class ReleaseRecordTests(unittest.TestCase):
     def test_resolves_versions_in_all_locales_before_parsing_metadata(self) -> None:
